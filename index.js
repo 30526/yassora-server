@@ -1,14 +1,13 @@
-const express = require('express')
-const cors = require('cors')
-require('dotenv').config()
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const app = express()
-const PORT = process.env.PORT || 3000
-
-app.use(cors())
-app.use(express.json())
+app.use(cors());
+app.use(express.json());
 
 const uri = process.env.DB_URI;
 
@@ -17,7 +16,7 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
@@ -25,30 +24,50 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-   const database = client.db('yassoraaDB')
-   const productsCollection = database.collection('products')
+    const database = client.db("yassoraaDB");
+    const productsCollection = database.collection("products");
     // Send a ping to confirm a successful connection
 
-    app.post('/products',async(req, res)=>{
-        const product = req.body
-    const result = await productsCollection.insertOne(product)
-res.send(result )})
+    app.post("/products", async (req, res) => {
+      const product = req.body;
+      product.createdAt = new Date();
+      const result = await productsCollection.insertOne(product);
+      res.send(result);
+    });
 
-app.get('/products', async( req, res)=>{
-    const cursor = productsCollection.find()
-    const products = await cursor.toArray()
-    res.send(products)
-})
+    app.get("/products", async (req, res) => {
+      try {
+        const cursor = productsCollection.find().project({name:1, sizes:1, images:1}).sort({ createdAt: -1 });
+        const products = await cursor.toArray();
+        res.send(products);
+      } catch (err) {
+        res.status(500).json({ message: "Failed to fetch products" });
+      }
+    });
 
-app.get('/products/:id', async(req, res)=>{
-    const id = req.params.id
-    const query ={_id: new ObjectId(id)}
-    const product = await productsCollection.findOne(query)
-    res.send(product)})
+    app.get("/products/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const product = await productsCollection.findOne(query);
+        res.send(product);
+      } catch (err) {
+        res.status(500).json({ message: "Failed to fetch the product" });
+      }
+    });
 
+    //404
+    app.all(/.*/, (req, res) => {
+      res.status(404).json({
+        status: 404,
+        error: "API not found",
+      });
+    });
 
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!",
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -56,11 +75,10 @@ app.get('/products/:id', async(req, res)=>{
 }
 run().catch(console.dir);
 
-app.get('/', (req, res)=>{
-    res.send('Hello World!')
-})
+app.get("/", (req, res) => {
+  res.send("Hello World!");
+});
 
-app.listen(PORT,()=>{
-    console.log(`Server is running on port ${PORT}`)
-})
-
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
